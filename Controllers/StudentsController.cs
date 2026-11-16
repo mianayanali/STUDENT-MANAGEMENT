@@ -90,5 +90,45 @@ namespace STUDENT_MANAGEMENT.Controllers
 
             return NoContent();
         }
+        // GET: api/students/search?name=Ali - Name ke zariye students search karna
+        [HttpGet("search")]
+        public async Task<IActionResult> SearchByName([FromQuery] string name)
+        {
+            // Check karna ke search ka word khali na ho
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return BadRequest("Search term cannot be empty.");
+            }
+            var students = await _context.Students
+                .Where(s => s.Name.ToLower().Contains(name.ToLower()))
+                .ToListAsync();
+
+            return Ok(students);
+        }
+        // GET: api/students/filter-by-age?minAge=18&maxAge=25 - Age range ke mutabiq filter karna
+        [HttpGet("filter-by-age")]
+        public async Task<IActionResult> FilterByAge([FromQuery] int minAge, [FromQuery] int maxAge)
+        {
+            // Validation: minAge hamesha maxAge se choti ya barabar honi chahiye
+            if (minAge > maxAge)
+            {
+                return BadRequest("minAge cannot be greater than maxAge.");
+            }
+
+            var students = await _context.Students
+                .Where(s => s.Age >= minAge && s.Age <= maxAge)
+                .ToListAsync();
+
+            return Ok(students);
+        }
+        // GET: api/students/count - Total students ki tadad return karna
+        [HttpGet("count")]
+        public async Task<IActionResult> GetCount()
+        {
+            // Database me mojood total students count karna
+            var totalCount = await _context.Students.CountAsync();
+
+            return Ok(new { TotalStudents = totalCount });
+        }
     }
 }
