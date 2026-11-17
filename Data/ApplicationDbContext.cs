@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using STUDENT_MANAGEMENT.Models;
 
 namespace STUDENT_MANAGEMENT.Data
@@ -13,5 +13,6 @@ namespace STUDENT_MANAGEMENT.Data
         public DbSet<Student> Students { get; set; }
         public DbSet<Course> Courses { get; set; }
         public DbSet<Enrollment> Enrollments { get; set; }
+        public DbSet<AppUser> Users { get; set; }
     }
 }
