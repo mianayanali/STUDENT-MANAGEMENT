@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using STUDENT_MANAGEMENT.Data;
+using STUDENT_MANAGEMENT.DTOs.Courses;
 using STUDENT_MANAGEMENT.Models;
 
 namespace STUDENT_MANAGEMENT.Controllers
@@ -35,27 +36,42 @@ namespace STUDENT_MANAGEMENT.Controllers
 
             return Ok(course);
         }
-        // POST: api/courses - Naya course database me create karna
+        // POST: api/courses - Naya course CreateCourseDTO ke zariye create karna
         [HttpPost]
-        public async Task<IActionResult> Create(Course course)
+        public async Task<IActionResult> Create(CreateCourseDTO dto)
         {
-            // Business Validation Rules
-            if (string.IsNullOrWhiteSpace(course.CourseName))
-            {
-                return BadRequest("Course name is required.");
+            // Duplicate Course Name Check (Section 9.2 rule)
+            var courseExists = await _context.Courses
+                .AnyAsync(c => c.CourseName.ToLower() == dto.CourseName.ToLower());
 
-            }
-            if(course.DurationInMonths <= 0)
+            if (courseExists)
             {
-                return BadRequest("Duration must be greater than zero months.");
+                return Conflict("A course with this name already exists.");
             }
-            if (course.Fee < 0)
+
+            // DTO ko Database Model (Course) mein map karna
+            var course = new Course
             {
-                return BadRequest("Fee cannot be negative.");
-            }
+                CourseName = dto.CourseName,
+                Description = dto.Description,
+                DurationInMonths = dto.DurationInMonths,
+                Fee = dto.Fee
+            };
+
             await _context.Courses.AddAsync(course);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetById), new { id = course.Id }, course);
+
+            // Response DTO banana
+            var response = new CourseResponseDTO
+            {
+                Id = course.Id,
+                CourseName = course.CourseName,
+                Description = course.Description,
+                DurationInMonths = course.DurationInMonths,
+                Fee = course.Fee
+            };
+
+            return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
         }
         // PUT: api/courses/{id} - Mojooda course ka data update karna
         [HttpPut("{id}")]

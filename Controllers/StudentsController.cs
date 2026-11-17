@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using STUDENT_MANAGEMENT.Data;
+using STUDENT_MANAGEMENT.DTOs.Students;
 using STUDENT_MANAGEMENT.Models;
 
 namespace STUDENT_MANAGEMENT.Controllers
@@ -38,39 +39,70 @@ namespace STUDENT_MANAGEMENT.Controllers
             }
             return Ok(student);
         }
-        // POST: api/students - Naya student database me create karna
+        // POST: api/students - Naya student DTO ke zariye create karna
         [HttpPost]
-        public async Task<IActionResult>Create(Student student)
+        public async Task<IActionResult> Create(CreateStudentDTO dto)
         {
-            // Server side record creation ka waqt set karna
-            student.CreatedAt = DateTime.UtcNow;
+            // Duplicate Email Check (Section 9.1 rule)
+            var emailExists = await _context.Students.AnyAsync(s => s.Email == dto.Email);
+            if (emailExists)
+            {
+                return Conflict("A student with this email already exists.");
+            }
 
-            // Database ke Students table me naya record add karna
-            await _context.AddAsync(student);
+            // DTO ko database entity (Student) mein map karna
+            var student = new Student
+            {
+                Name = dto.Name,
+                Age = dto.Age,
+                Email = dto.Email,
+                Phone = dto.Phone,
+                CreatedAt = DateTime.UtcNow
+            };
 
+            await _context.Students.AddAsync(student);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetById),
-                new { id = student.Id }, student);
-        }
-        // PUT: api/students/{id} - Mojooda student ka data update karna
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Student updatedStudent)
-        {
-            // PUT: api/students/{id} - Mojooda student ka data update karna
-            var student = await _context.Students.FindAsync(id);
+            // Response DTO banana
+            var response = new StudentResponseDTO
+            {
+                Id = student.Id,
+                Name = student.Name,
+                Age = student.Age,
+                Email = student.Email,
+                Phone = student.Phone,
+                CreatedAt = student.CreatedAt
+            };
 
+            return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
+        }
+        // PUT: api/students/{id} - Student data ko UpdateStudentDTO se update karna
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, UpdateStudentDTO dto)
+        {
+            var student = await _context.Students.FindAsync(id);
             if (student == null)
             {
                 return NotFound();
             }
 
-            student.Name = updatedStudent.Name;
-            student.Age = updatedStudent.Age;
-            student.Email = updatedStudent.Email;
-            student.Phone = updatedStudent.Phone;
+            // Check duplicate email (agar user ne email change ki hai aur wo kisi aur student ki hai)
+            var emailExists = await _context.Students
+                .AnyAsync(s => s.Email == dto.Email && s.Id != id);
+
+            if (emailExists)
+            {
+                return Conflict("Another student is already using this email.");
+            }
+
+            // DTO ki values ko student entity mein update karna
+            student.Name = dto.Name;
+            student.Age = dto.Age;
+            student.Email = dto.Email;
+            student.Phone = dto.Phone;
 
             await _context.SaveChangesAsync();
+
             return NoContent();
         }
         // DELETE: api/students/{id} - Student ko database se delete karna
