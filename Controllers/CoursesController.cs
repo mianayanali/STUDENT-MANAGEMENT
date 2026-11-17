@@ -1,9 +1,6 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using STUDENT_MANAGEMENT.Data;
 using STUDENT_MANAGEMENT.DTOs.Courses;
-using STUDENT_MANAGEMENT.Models;
+using STUDENT_MANAGEMENT.Services.Interfaces;
 
 namespace STUDENT_MANAGEMENT.Controllers
 {
@@ -11,119 +8,74 @@ namespace STUDENT_MANAGEMENT.Controllers
     [ApiController]
     public class CoursesController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-        public CoursesController(ApplicationDbContext context)
+        private readonly ICourseService _courseService;
+
+        public CoursesController(ICourseService courseService)
         {
-            _context = context;
+            _courseService = courseService;
         }
-        // GET: api/courses - Tamam courses database se lana
+
+        // GET: api/courses - Tamam courses lana
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var courses = await _context.Courses.ToListAsync();
+            var courses = await _courseService.GetAllCoursesAsync();
             return Ok(courses);
         }
-        // GET: api/courses/{id} - Kisi aik course ko uski ID se dhoondna
+
+        // GET: api/courses/{id} - Course by ID
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var course = await _context.Courses.FindAsync(id);
-
+            var course = await _courseService.GetCourseByIdAsync(id);
             if (course == null)
             {
                 return NotFound();
             }
-
             return Ok(course);
         }
-        // POST: api/courses - Naya course CreateCourseDTO ke zariye create karna
+
+        // POST: api/courses - Naya course create karna
         [HttpPost]
         public async Task<IActionResult> Create(CreateCourseDTO dto)
         {
-            // Duplicate Course Name Check (Section 9.2 rule)
-            var courseExists = await _context.Courses
-                .AnyAsync(c => c.CourseName.ToLower() == dto.CourseName.ToLower());
-
-            if (courseExists)
+            var createdCourse = await _courseService.CreateCourseAsync(dto);
+            if (createdCourse == null)
             {
                 return Conflict("A course with this name already exists.");
             }
 
-            // DTO ko Database Model (Course) mein map karna
-            var course = new Course
-            {
-                CourseName = dto.CourseName,
-                Description = dto.Description,
-                DurationInMonths = dto.DurationInMonths,
-                Fee = dto.Fee
-            };
-
-            await _context.Courses.AddAsync(course);
-            await _context.SaveChangesAsync();
-
-            // Response DTO banana
-            var response = new CourseResponseDTO
-            {
-                Id = course.Id,
-                CourseName = course.CourseName,
-                Description = course.Description,
-                DurationInMonths = course.DurationInMonths,
-                Fee = course.Fee
-            };
-
-            return CreatedAtAction(nameof(GetById), new { id = response.Id }, response);
+            return CreatedAtAction(nameof(GetById), new { id = createdCourse.Id }, createdCourse);
         }
-        // PUT: api/courses/{id} - Mojooda course ka data update karna
+
+        // PUT: api/courses/{id} - Course update karna
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Course updatedCourse)
+        public async Task<IActionResult> Update(int id, UpdateCourseDTO dto)
         {
-            // Validations
-            if (string.IsNullOrWhiteSpace(updatedCourse.CourseName))
-            {
-                return BadRequest("Course name is required.");
-            }
+            var result = await _courseService.UpdateCourseAsync(id, dto);
 
-            if (updatedCourse.DurationInMonths <= 0)
-            {
-                return BadRequest("Duration must be greater than zero months.");
-            }
-
-            if (updatedCourse.Fee < 0)
-            {
-                return BadRequest("Fee cannot be negative.");
-            }
-
-            // Database se course dhoondna
-            var course = await _context.Courses.FindAsync(id);
-
-            if (course == null)
+            if (result == false)
             {
                 return NotFound();
             }
 
-            // Fields update karna
-            course.CourseName = updatedCourse.CourseName;
-            course.Description = updatedCourse.Description;
-            course.DurationInMonths = updatedCourse.DurationInMonths;
-            course.Fee = updatedCourse.Fee;
-
-            await _context.SaveChangesAsync();
+            if (result == null)
+            {
+                return Conflict("Another course with this name already exists.");
+            }
 
             return NoContent();
         }
-        // DELETE: api/courses/{id} - Course ko database se delete karna
+
+        // DELETE: api/courses/{id} - Course delete karna
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var course = await _context.Courses.FindAsync(id);
-
-            if (course == null)
+            var deleted = await _courseService.DeleteCourseAsync(id);
+            if (!deleted)
             {
                 return NotFound();
             }
-
-            _context.Courses.Remove(course);
-            await _context.SaveChangesAsync();
 
             return NoContent();
         }
